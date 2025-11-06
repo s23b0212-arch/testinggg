@@ -2,90 +2,91 @@ import streamlit as st
 import pandas as pd
 import random
 
-# Set page configuration
-st.set_page_config(page_title="TV Program Scheduler", layout="wide")
+# ------------------ PAGE CONFIG ------------------
+st.set_page_config(page_title="TV Program Scheduler - User Input", layout="wide")
 
-# Apply custom CSS for styling
+# ------------------ CSS STYLING ------------------
 st.markdown("""
-    <style>
-    /* Background color for the sidebar */
-    .css-1d391kg {
-        background-color: #FFEBCC;  /* Light orange background */
+<style>
+    body {
+        background-color: #f5f5dc; /* Beige */
     }
-
-    /* Background color for the main content area */
-    .main .block-container {
-        background-color: #FFEBCC;  /* Light orange background */
+    h1 {
+        text-align: center;
+        color: #e67e22;
+        font-size: 42px;
+        font-weight: bold;
+        text-shadow: 2px 2px 5px rgba(0,0,0,0.2);
     }
-
-    /* Adjust text color in the header */
-    .main-title {
-        color: #1E88E5;  /* Blue text */
+    p {
+        text-align: center;
+        color: #444;
+        font-weight: bold;
     }
-
-    /* Style buttons */
-    .stButton>button {
-        background-color: #1E88E5;
+    [data-testid="stSidebar"] {
+        background-color: #FFE4B5; /* Light orange sidebar */
+    }
+    .stButton button {
+        background-color: #e67e22;
         color: white;
-        border-radius: 10px;
-        height: 3em;
-        width: 100%;
-        font-size: 16px;
-        font-weight: 600;
+        font-weight: bold;
+        border-radius: 8px;
     }
-
-    .stButton>button:hover {
-        background-color: #1565C0;
-        color: #fff;
+    .stButton button:hover {
+        background-color: #ca6f1e;
     }
-    </style>
+</style>
 """, unsafe_allow_html=True)
 
-# Title and subtitle
-st.markdown("""
-    <h1 class="main-title" style="text-align:center;">TV Program Scheduler - Genetic Algorithm</h1>
-    <p style="text-align:center; color:#555;">Optimize your daily broadcast schedule for maximum viewer ratings</p>
-""", unsafe_allow_html=True)
+# ------------------ TITLE ------------------
+st.markdown("<h1>🎬 TV Program Scheduler - User Input</h1>", unsafe_allow_html=True)
+st.markdown("<p>Enter your TV programs and viewer ratings manually to find the optimal schedule!</p>", unsafe_allow_html=True)
 
-# Upload CSV file
-uploaded_file = st.file_uploader("Upload your CSV file with program ratings", type=["csv"])
-
-# Sidebar for GA parameters
-st.sidebar.header("Genetic Algorithm Parameters")
+# ------------------ SIDEBAR ------------------
+st.sidebar.header("GENETIC ALGORITHM PARAMETERS")
 CO_R = st.sidebar.slider("Crossover Rate", 0.0, 0.95, 0.8, 0.01)
 MUT_R = st.sidebar.slider("Mutation Rate", 0.01, 0.05, 0.02, 0.01)
 GEN = st.sidebar.number_input("Generations", 50, 500, 100, 10)
 POP = st.sidebar.number_input("Population Size", 10, 200, 50, 10)
 EL_S = 2
 
-# Function to read CSV file
-@st.cache_data
-def read_csv(file):
-    df = pd.read_csv(file)
-    ratings = {row[0]: [float(x) for x in row[1:]] for _, row in df.iterrows()}
-    time_slots = df.columns[1:]
-    return ratings, list(time_slots)
+# ------------------ USER INPUT SECTION ------------------
+st.subheader("📺 Enter Program Ratings")
+num_programs = st.number_input("Number of programs to schedule:", 3, 10, 5)
 
-# Fitness function for schedule evaluation
+programs = []
+ratings = {}
+
+for i in range(num_programs):
+    st.markdown(f"#### Program {i+1}")
+    program_name = st.text_input(f"Enter program name {i+1}:", key=f"name_{i}")
+    program_ratings = []
+    
+    cols = st.columns(3)
+    for hour in range(6, 9):  # You can adjust time slots here
+        rating = cols[hour-6].slider(f"Hour {hour}", 0.0, 1.0, random.uniform(0.2, 0.8), 0.1, key=f"rate_{i}_{hour}")
+        program_ratings.append(rating)
+    
+    if program_name:
+        programs.append(program_name)
+        ratings[program_name] = program_ratings
+
+# ------------------ GA FUNCTIONS ------------------
 def fitness(schedule, ratings):
-    return sum(ratings[prog][i] for i, prog in enumerate(schedule))
+    return sum(ratings[prog][i % len(ratings[prog])] for i, prog in enumerate(schedule))
 
-# Initialize population for genetic algorithm
 def initialize_population(programs, size):
     return [random.sample(programs, len(programs)) for _ in range(size)]
 
-# Crossover function
 def crossover(p1, p2):
     point = random.randint(1, len(p1)-2)
     return p1[:point] + p2[point:], p2[:point] + p1[point:]
 
-# Mutation function
 def mutate(schedule, all_programs):
     i = random.randint(0, len(schedule)-1)
     schedule[i] = random.choice(all_programs)
     return schedule
 
-# Genetic algorithm function
 def genetic_algorithm(all_programs, ratings):
     population = initialize_population(all_programs, POP)
     for _ in range(GEN):
@@ -105,19 +106,23 @@ def genetic_algorithm(all_programs, ratings):
         population = new_pop
     return max(population, key=lambda s: fitness(s, ratings))
 
-# Run GA
-if uploaded_file:
-    ratings, time_slots = read_csv(uploaded_file)
-    all_programs = list(ratings.keys())
-    if st.button("Generate Optimal Schedule"):
-        schedule = genetic_algorithm(all_programs, ratings)
+# ------------------ RUN OPTIMIZATION ------------------
+if st.button("Generate Optimal Schedule"):
+    if len(programs) > 0:
+        schedule = genetic_algorithm(programs, ratings)
         total_rating = fitness(schedule, ratings)
-        # Trim if mismatch
-        min_len = min(len(schedule), len(time_slots))
-        schedule = schedule[:min_len]
-        time_slots_trim = time_slots[:min_len]
-        df_result = pd.DataFrame({"Hour": time_slots_trim, "Program": schedule})
-        st.success(f"Optimal schedule generated! Total Rating: {total_rating:.2f}")
-        st.dataframe(df_result, use_container_width=True)
-else:
-    st.info("Upload your CSV file to start scheduling.")
+        hours = [f"Hour {i+6}" for i in range(len(schedule))]
+        
+        df_result = pd.DataFrame({"Hour": hours, "Program": schedule})
+        
+        # Stylish table with light orange background
+        styled_df = df_result.style.set_properties(**{
+            'background-color': '#FFE4B5',
+            'color': 'black',
+            'font-weight': 'bold'
+        })
+        
+        st.success(f"Optimal schedule generated! ⭐ Total Rating: {total_rating:.2f}")
+        st.dataframe(styled_df, use_container_width=True)
+    else:
+        st.warning("Please enter at least one program.")
