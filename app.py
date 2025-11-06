@@ -2,81 +2,134 @@ import streamlit as st
 import pandas as pd
 import random
 
-# ------------------ 1. PAGE CONFIG ------------------
+# ------------------ PAGE CONFIG ------------------
 st.set_page_config(page_title="TV Program Scheduler using GA", layout="wide")
 
-st.markdown(
-    """
-    <style>
-    h1 {
-        text-align: center;
-        color: #1E88E5;
-        text-shadow: 1px 1px 2px #90CAF9;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+# ------------------ CUSTOM PAGE STYLE ------------------
+st.markdown("""
+<style>
+/* General font and background */
+html, body, [class*="css"]  {
+    font-family: 'Poppins', sans-serif;
+    background-color: #F4F7FB;
+    color: #222;
+}
 
+/* Title */
+h1 {
+    text-align: center;
+    color: #1E88E5;
+    font-weight: 800;
+    font-size: 40px;
+    text-shadow: 1px 1px 2px #90CAF9;
+    margin-bottom: 30px;
+}
+
+/* Section headers */
+h2, h3, h4 {
+    color: #1565C0;
+    font-weight: 700;
+}
+
+/* Info boxes and success boxes */
+div.stAlert > div {
+    font-size: 16px;
+}
+
+/* Buttons */
+div.stButton > button {
+    background-color: #1E88E5;
+    color: white;
+    border-radius: 10px;
+    font-weight: 600;
+    transition: 0.3s;
+}
+div.stButton > button:hover {
+    background-color: #1565C0;
+    transform: scale(1.02);
+}
+
+/* Table style */
+thead tr th {
+    background-color: #1E88E5 !important;
+    color: white !important;
+    font-weight: 700 !important;
+    text-align: center !important;
+}
+tbody tr:nth-child(even) {
+    background-color: #E3F2FD !important;
+}
+tbody tr:nth-child(odd) {
+    background-color: #FFFFFF !important;
+}
+td {
+    text-align: center !important;
+    font-weight: 500;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ------------------ PAGE HEADER ------------------
 st.markdown("<h1>📺 TV Program Scheduling using Genetic Algorithm</h1>", unsafe_allow_html=True)
 
-# ------------------ 2. READ CSV FILE ------------------
-st.subheader("📂 Upload Program Ratings CSV File")
+# ------------------ 1. UPLOAD CSV ------------------
+st.markdown("### 📂 **Upload Program Ratings CSV File**")
 
-uploaded_file = st.file_uploader("Upload your program_ratings.csv file", type=["csv"])
+uploaded_file = st.file_uploader("Upload your CSV file below:", type=["csv"])
 
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
-    st.write("### Original Rating Data:")
-    st.dataframe(df)
+    st.markdown("### 🧾 **Original Rating Data**")
+    st.dataframe(df, use_container_width=True)
 
-    # ------------------ 3. MODIFY RATING DATA ------------------
-    st.info("You can modify ratings below (optional).")
-
+    # ------------------ 2. MODIFY RATING DATA ------------------
+    st.markdown("### ✏️ **Modify Program Ratings (Optional)**")
+    st.info("You can edit the ratings directly below to test different scenarios.")
     edited_df = st.data_editor(df, num_rows="dynamic")
-    st.write("### Modified Rating Data:")
-    st.dataframe(edited_df)
+    st.markdown("### ✅ **Modified Rating Data**")
+    st.dataframe(edited_df, use_container_width=True)
 
-    # Convert dataframe to dictionary {Program: [ratings]}
+    # Convert DataFrame to dictionary
     program_ratings = {}
     for i, row in edited_df.iterrows():
         program = row[0]
         ratings = [float(x) for x in row[1:]]
         program_ratings[program] = ratings
 
-    # ------------------ 4. STREAMLIT PARAMETER INPUT ------------------
-    st.subheader("⚙️ Genetic Algorithm Parameters")
+    # ------------------ 3. PARAMETER INPUT ------------------
+    st.markdown("### ⚙️ **Genetic Algorithm Parameters**")
+    col1, col2 = st.columns(2)
 
-    CO_R = st.slider(
-        "Crossover Rate (CO_R)",
-        0.0, 0.95, 0.8, 0.01,
-        help="Controls how much parent genes combine during crossover."
-    )
+    with col1:
+        CO_R = st.slider(
+            "Crossover Rate (CO_R)",
+            0.0, 0.95, 0.8, 0.01,
+            help="Controls how much parent genes combine during crossover."
+        )
 
-    MUT_R = st.slider(
-        "Mutation Rate (MUT_R)",
-        0.01, 0.05, 0.02, 0.01,
-        help="Determines how often random mutations occur in the population."
-    )
+    with col2:
+        MUT_R = st.slider(
+            "Mutation Rate (MUT_R)",
+            0.01, 0.05, 0.02, 0.01,
+            help="Determines how often random mutations occur in the population."
+        )
 
-    st.success(f"✅ Parameters set: Crossover = {CO_R}, Mutation = {MUT_R}")
+    st.success(f"**Crossover Rate (CO_R):** {CO_R}  **Mutation Rate (MUT_R):** {MUT_R}")
 
-    # ------------------ 5. RUN GENETIC ALGORITHM ------------------
-    st.subheader("🚀 Run Genetic Algorithm")
+    # ------------------ 4. RUN GENETIC ALGORITHM ------------------
+    st.markdown("### 🚀 **Run the Genetic Algorithm**")
 
-    if st.button("Run Scheduler"):
+    if st.button("🧩 Run Scheduler"):
         programs = list(program_ratings.keys())
-
-        # Assume time slots equal number of programs
         num_slots = len(programs)
         population_size = 10
         generations = 20
 
-        # Initialize population (each schedule is a random permutation)
+        # Create population
         def create_population():
             return [random.sample(programs, num_slots) for _ in range(population_size)]
 
-        # Fitness: total rating sum (for demonstration)
+        # Fitness function (sum of ratings per schedule)
         def fitness(schedule):
             total = 0
             for i, prog in enumerate(schedule):
@@ -96,7 +149,7 @@ if uploaded_file is not None:
             else:
                 return p1
 
-        # Mutation (swap two programs)
+        # Mutation (swap two positions)
         def mutate(schedule):
             if random.random() < MUT_R:
                 i, j = random.sample(range(num_slots), 2)
@@ -117,15 +170,16 @@ if uploaded_file is not None:
 
         best_schedule = max(population, key=fitness)
 
-        # ------------------ 6. DISPLAY RESULTING SCHEDULE ------------------
-        st.subheader("🗓️ Generated TV Schedule")
+        # ------------------ 5. DISPLAY RESULTS ------------------
+        st.markdown("### 🗓️ **Generated TV Schedule**")
 
         schedule_df = pd.DataFrame({
-            "Time Slot": [f"Slot {i+1}" for i in range(num_slots)],
-            "Program": best_schedule
+            "🕒 Time Slot": [f"Slot {i+1}" for i in range(num_slots)],
+            "🎬 Program": best_schedule
         })
 
         st.table(schedule_df)
-        st.success("✅ Genetic Algorithm completed successfully!")
+
+        st.success("🎉 The Genetic Algorithm has successfully generated an optimal schedule!")
 else:
-    st.warning("Please upload a CSV file to begin.")
+    st.warning("⚠️ Please upload a CSV file to begin.")
